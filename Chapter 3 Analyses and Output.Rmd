@@ -1,0 +1,329 @@
+---
+Title: "Chapter 3 Data Analyses"
+Output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+#######################################################################################
+# Chapter 3 Data Analyses
+# Author: Ryan Falck
+# Last edited: 2019-11-27
+#######################################################################################
+
+
+#Data management---------------------------------------------
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(readxl, psych, pastecs, Hmisc,lme4, car, lsmeans,lmerTest, ggplot2, emmeans, dplyr)
+setwd("C:/Users/rfalck/Desktop/UBC-PhD/Thesis Material/Thesis defense materials/Theis Data and Analyses")#Directory where you put the spreadsheet
+PAcog <- read_excel("Chapter 3 Data.xlsx", sheet= "Averages")
+
+data1 <- PAcog[-c(8,40,42,105,122,136),]
+data2 <- data1[ which(data1$`ADAS-Cog Plus` < 1.29),]
+
+library(plyr)
+Final <- data2[c(1,5,6,8,9,11:14,21,23,36:37,38,43,45,51,63)]
+
+Final$EDU<-NA
+Final$EDU[Final$Education==5]<-"University"
+Final$EDU[Final$Education==4]<-"Some College"
+Final$EDU[Final$Education==3]<-"Trade School"
+Final$EDU[Final$Education<3]<-"High School or less"
+
+Final$MCI[Final$MCI==1]<-"MCI"
+Final$MCI[Final$MCI==0]<-"Healthy"
+
+Final$`Retired?`[Final$`Retired?`==1]<-"Retired"
+Final$`Retired?`[Final$`Retired?`==0]<-"Working"
+
+Final$Smoking<-NA
+Final$Smoking[Final$`Current Smoker`==1]<-"Smoker"
+Final$Smoking[Final$`Current Smoker`==0 & Final$`Past Smoker`==1]<-"Past Smoker"
+Final$Smoking[Final$`Current Smoker`==0 & Final$`Past Smoker`==0]<-"Non-Smoker"
+
+Final$lnMVPAbouts<- log(Final$`Avg 10+ Min Bouts of MVPA`+1)
+Final$Age.c<- scale(Final$Age, center = TRUE, scale= FALSE)
+Final$MVPA.c<-scale(Final$`%MVPA Time`, center = TRUE, scale = FALSE)
+Final$MVPAbouts.c<-scale(Final$lnMVPAbouts, center = TRUE, scale = FALSE)
+Final$SB.c<-scale(Final$`%SB Time`, center = TRUE, scale = FALSE)
+Final$SBbouts.c<-scale(Final$`Avg 30+ Min Bouts of SB`, center = TRUE, scale = FALSE)
+
+#Descriptive Statistics----------------------------------
+
+stat.desc(Final$Age)
+describeBy(Final$Age, group = Final$MCI)
+t.test(Final$Age~Final$MCI)
+
+Sextable<-table(Final$Sex, Final$MCI)
+chisq.test(Sextable)
+
+EdUtable<-table(Final$EDU, Final$MCI)
+chisq.test(EdUtable)
+
+Retiredtable<-table(Final$`Retired?`, Final$MCI)
+chisq.test(Retiredtable)
+
+Smokingtable<-table(Final$Smoking, Final$MCI)
+chisq.test(Smokingtable)
+
+stat.desc(Final$`%MVPA Time`)
+describeBy(Final$`%MVPA Time`, group= Final$MCI)
+MVPA.lm<-lm(`%MVPA Time`~Age+Sex+MCI,data=Final)
+anova(MVPA.lm)
+
+stat.desc(Final$lnMVPAbouts)
+describeBy(Final$lnMVPAbouts, group= Final$MCI)
+MVPAbouts.lm<-lm(lnMVPAbouts~Age+Sex+MCI,data=Final)
+anova(MVPAbouts.lm)
+
+stat.desc(Final$`%SB Time`)
+describeBy(Final$`%SB Time`, group= Final$MCI)
+SB.lm<-lm(`%SB Time`~Age+Sex+MCI,data=Final)
+anova(SB.lm)
+
+stat.desc(Final$`Avg 30+ Min Bouts of SB`)
+describeBy(Final$`Avg 30+ Min Bouts of SB`, group= Final$MCI)
+SBbouts.lm<-lm(`Avg 30+ Min Bouts of SB`~Age+Sex+MCI,data=Final)
+anova(SBbouts.lm)
+
+stat.desc(Final$`ADAS-Cog Plus`)
+describeBy(Final$`ADAS-Cog Plus`, group= Final$MCI)
+ADASCog.lm<-lm(`ADAS-Cog Plus`~Age+Sex+MCI,data=Final)
+anova(ADASCog.lm)
+
+stat.desc(Final$MoCA)
+describeBy(Final$MoCA, group= Final$MCI)
+MoCA.lm<-lm(MoCA~Age+Sex+MCI,data=Final)
+anova(MoCA.lm)
+
+stat.desc(Final$MMSE)
+describeBy(Final$MMSE, group= Final$MCI)
+MMSE.lm<-lm(MMSE~Age+Sex+MCI,data=Final)
+anova(MMSE.lm)
+
+
+
+#Linear regression analyses---------------------------
+PAcog.lm<-lm(`ADAS-Cog Plus`~`%MVPA Time`+Age.c+Sex+EDU,Final)
+PAcog.lm2<-lm(`ADAS-Cog Plus`~Age.c+Sex+EDU,Final)
+summary(PAcog.lm)
+summary(PAcog.lm2)
+
+PAboutscog.lm<-lm(`ADAS-Cog Plus`~lnMVPAbouts+Age.c+Sex+EDU,Final)
+PAboutscog.lm2<-lm(`ADAS-Cog Plus`~Age.c+Sex+EDU,Final)
+summary(PAcog.lm)
+summary(PAcog.lm2)
+
+SBcog.lm<-lm(`ADAS-Cog Plus`~`%SB Time`+Age.c+Sex+EDU,Final)
+SBcog.lm2<-lm(`ADAS-Cog Plus`~Age.c+Sex+EDU,Final)
+summary(SBcog.lm)
+summary(SBcog.lm2)
+
+SBboutscog.lm<-lm(`ADAS-Cog Plus`~`Avg 30+ Min Bouts of SB`+Age.c+Sex+EDU,Final)
+SBboutscog.lm2<-lm(`ADAS-Cog Plus`~Age.c+Sex+EDU,Final)
+summary(SBboutscog.lm)
+summary(SBboutscog.lm2)
+
+
+#Graphs (Figure 1)-----------------------------
+mean(Final$`%MVPA Time`)
+#%PA and Cognition
+MVPAresid<-residuals(lm(`%MVPA Time`~Age.c+Sex+EDU,Final))
+ADASCogresid<-residuals(lm(`ADAS-Cog Plus`~Age.c+Sex+EDU,Final))
+MVPA.adas.graph<-as.data.frame(cbind(MVPAresid,ADASCogresid))
+MVPA.adas.graph$MVPAresid<-MVPA.adas.graph$MVPAresid + mean(Final$`%MVPA Time`)
+MVPA.adas.graph$ADASCogresid<-MVPA.adas.graph$ADASCogresid + mean(Final$`ADAS-Cog Plus`)
+ggplot(data = MVPA.adas.graph, aes(x = MVPA.adas.graph$MVPAresid, y = MVPA.adas.graph$ADASCogresid)) + 
+  labs(x="%MVPA Time", y="ADAS-Cog Plus Score") +geom_point(color='black') + geom_smooth(method= 'lm',  se = TRUE, color= 'black') +
+  theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+                     panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+
+#PA Bouts and Cognition
+MVPAboutsresid<-residuals(lm(lnMVPAbouts~Age.c+Sex+EDU,Final))
+MVPAbouts.adas.graph<-as.data.frame(cbind(MVPAboutsresid,ADASCogresid))
+MVPAbouts.adas.graph$MVPAboutsresid<-MVPAbouts.adas.graph$MVPAboutsresid + mean(Final$lnMVPAbouts)
+MVPAbouts.adas.graph$ADASCogresid<-MVPAbouts.adas.graph$ADASCogresid + mean(Final$`ADAS-Cog Plus`)
+ggplot(data = MVPAbouts.adas.graph, aes(x = MVPAbouts.adas.graph$MVPAboutsresid, y = MVPAbouts.adas.graph$ADASCogresid)) + 
+  labs(x="LN(Average 10+ minute MVPA bouts/day)", y="ADAS-Cog Plus Score") +geom_point(color='black') + geom_smooth(method= 'lm',  se = TRUE, color= 'black') +
+  theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+                     panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+
+
+#%SB and Cognition
+SBresid<-residuals(lm(`%SB Time`~Age.c+Sex+EDU,Final))
+SB.adas.graph<-as.data.frame(cbind(SBresid,ADASCogresid))
+SB.adas.graph$SBresid<-SB.adas.graph$SBresid + mean(Final$`%SB Time`)
+SB.adas.graph$ADASCogresid<-SB.adas.graph$ADASCogresid + mean(Final$`ADAS-Cog Plus`)
+ggplot(data = SB.adas.graph, aes(x = SB.adas.graph$SBresid, y = SB.adas.graph$ADASCogresid)) + 
+  labs(x="%SB Time", y="ADAS-Cog Plus Score") +geom_point(color='black') + geom_smooth(method= 'lm',  se = TRUE, color= 'black') +
+  theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+                     panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+
+#SB Bouts and Cognition
+SBboutsresid<-residuals(lm(`Avg 30+ Min Bouts of SB`~Age+Sex+EDU,Final))
+SBbouts.adas.graph<-as.data.frame(cbind(SBboutsresid,ADASCogresid))
+SBbouts.adas.graph$SBboutsresid<-SBbouts.adas.graph$SBboutsresid + mean(Final$`Avg 30+ Min Bouts of SB`)
+SBbouts.adas.graph$ADASCogresid<-SBbouts.adas.graph$ADASCogresid + mean(Final$`ADAS-Cog Plus`)
+ggplot(data = SBbouts.adas.graph, aes(x = SBbouts.adas.graph$SBboutsresid, y = SBbouts.adas.graph$ADASCogresid)) + 
+  labs(x="Average 30+ SB bouts/day", y="ADAS-Cog Plus Score") +geom_point(color='black') + geom_smooth(method= 'lm',  se = TRUE, color= 'black') +
+  theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+                     panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+
+
+
+
+#SEPERATED BY MCI STATUS-------------------------------------
+#Seperate data sets by MCI status
+MCI<-subset(Final, MCI=="MCI")
+Healthy<-subset(Final, MCI=="Healthy")
+
+#MCI
+PAcog.lm<-lm(`ADAS-Cog Plus`~`%MVPA Time`+Age+Sex+EDU,MCI)
+PAcog.lm2<-lm(`ADAS-Cog Plus`~Age+Sex+EDU,MCI)
+summary(PAcog.lm)
+summary(PAcog.lm2)
+
+PAboutscog.lm<-lm(`ADAS-Cog Plus`~lnMVPAbouts+Age+Sex+EDU,MCI)
+PAboutscog.lm2<-lm(`ADAS-Cog Plus`~Age+Sex+EDU,MCI)
+summary(PAcog.lm)
+summary(PAcog.lm2)
+
+SBcog.lm<-lm(`ADAS-Cog Plus`~`%SB Time`+Age+Sex+EDU,MCI)
+SBcog.lm2<-lm(`ADAS-Cog Plus`~Age+Sex+EDU,MCI)
+summary(SBcog.lm)
+summary(SBcog.lm2)
+
+SBboutscog.lm<-lm(`ADAS-Cog Plus`~`Avg 30+ Min Bouts of SB`+Age+Sex+EDU,MCI)
+SBboutscog.lm2<-lm(`ADAS-Cog Plus`~Age+Sex+EDU,MCI)
+summary(SBboutscog.lm)
+summary(SBboutscog.lm2)
+
+
+#Healthy
+PAcog.lm<-lm(`ADAS-Cog Plus`~`%MVPA Time`+Age+Sex+EDU,Healthy)
+PAcog.lm2<-lm(`ADAS-Cog Plus`~Age+Sex+EDU,Healthy)
+summary(PAcog.lm)
+summary(PAcog.lm2)
+
+PAboutscog.lm<-lm(`ADAS-Cog Plus`~lnMVPAbouts+Age+Sex+EDU,Healthy)
+PAboutscog.lm2<-lm(`ADAS-Cog Plus`~Age+Sex+EDU,Healthy)
+summary(PAcog.lm)
+summary(PAcog.lm2)
+
+SBcog.lm<-lm(`ADAS-Cog Plus`~`%SB Time`+Age+Sex+EDU,Healthy)
+SBcog.lm2<-lm(`ADAS-Cog Plus`~Age+Sex+EDU,Healthy)
+summary(SBcog.lm)
+summary(SBcog.lm2)
+
+SBboutscog.lm<-lm(`ADAS-Cog Plus`~`Avg 30+ Min Bouts of SB`+Age+Sex+EDU,Healthy)
+SBboutscog.lm2<-lm(`ADAS-Cog Plus`~Age+Sex+EDU,Healthy)
+summary(SBboutscog.lm)
+summary(SBboutscog.lm2)
+
+
+#Graphs for Linear regressions by MCI status (Figure 2)------------------------
+
+#%PA and Cognition
+MVPAresidHealthy<-residuals(lm(`%MVPA Time`~Age+Sex+EDU,Healthy))
+ADASCogresidHealthy<-residuals(lm(`ADAS-Cog Plus`~Age+Sex+EDU,Healthy))
+
+
+MVPAresidMCI<-residuals(lm(`%MVPA Time`~Age+Sex+EDU,MCI))
+ADASCogresidMCI<-residuals(lm(`ADAS-Cog Plus`~Age+Sex+EDU,MCI))
+
+
+MVPA.adas.graph.healthy<-as.data.frame(cbind(MVPAresidHealthy,ADASCogresidHealthy))
+names(MVPA.adas.graph.healthy)<-c("MVPA","ADASCog")
+MVPA.adas.graph.healthy$ADASCog<-MVPA.adas.graph.healthy$ADASCog + mean(Healthy$`ADAS-Cog Plus`)
+MVPA.adas.graph.healthy$MVPA<-MVPA.adas.graph.healthy$MVPA + mean(Healthy$`%MVPA Time`)
+MVPA.adas.graph.healthy$Status<-"Healthy"
+
+
+MVPA.adas.graph.MCI<-as.data.frame(cbind(MVPAresidMCI,ADASCogresidMCI))
+names(MVPA.adas.graph.MCI)<-c("MVPA","ADASCog")
+MVPA.adas.graph.MCI$ADASCog<-MVPA.adas.graph.MCI$ADASCog + mean(MCI$`ADAS-Cog Plus`)
+MVPA.adas.graph.MCI$MVPA<-MVPA.adas.graph.MCI$MVPA + mean(MCI$`%MVPA Time`)
+MVPA.adas.graph.MCI$Status<-"MCI"
+
+
+MVPA.adas.graph.full<-rbind(MVPA.adas.graph.MCI,MVPA.adas.graph.healthy)
+
+ggplot(data = MVPA.adas.graph.full, aes(x = MVPA, y = ADASCog, color= Status, fill= Status)) + 
+  labs(x="%MVPA Time", y="ADAS-Cog Plus Score") +geom_point(color='black') + geom_smooth(method= 'lm') +
+  theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+                     panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+
+#PA Bouts and Cognition
+MVPAboutsresidHealthy<-residuals(lm(lnMVPAbouts~Age+Sex+EDU,Healthy))
+MVPAboutsresidMCI<-residuals(lm(lnMVPAbouts~Age+Sex+EDU,MCI))
+
+MVPAbouts.adas.graph.healthy<-as.data.frame(cbind(MVPAboutsresidHealthy,ADASCogresidHealthy))
+names(MVPAbouts.adas.graph.healthy)<-c("MVPAbouts","ADASCog")
+MVPAbouts.adas.graph.healthy$MVPAbouts<-MVPAbouts.adas.graph.healthy$MVPAbouts + mean(Healthy$lnMVPAbouts)
+MVPAbouts.adas.graph.healthy$Status<-"Healthy"
+
+MVPAbouts.adas.graph.MCI<-as.data.frame(cbind(MVPAboutsresidMCI,ADASCogresidMCI))
+names(MVPAbouts.adas.graph.MCI)<-c("MVPAbouts","ADASCog")
+MVPAbouts.adas.graph.MCI$MVPAbouts<-MVPAbouts.adas.graph.MCI$MVPAbouts + mean(MCI$lnMVPAbouts)
+MVPAbouts.adas.graph.MCI$Status<-"MCI"
+
+
+MVPAbouts.adas.graph.full<-rbind(MVPAbouts.adas.graph.MCI,MVPAbouts.adas.graph.healthy)
+
+ggplot(data = MVPAbouts.adas.graph.full, aes(x = MVPAbouts, y = ADASCog, color= Status, fill= Status)) + 
+  labs(x="LN(+10 Min Bouts/Day of MVPA)", y="ADAS-Cog Plus Score") +geom_point(color='black') + geom_smooth(method= 'lm') +
+  theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+                     panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+
+
+#%SB and Cognition
+SBresidHealthy<-residuals(lm(`%SB Time`~Age+Sex+EDU,Healthy))
+SBresidMCI<-residuals(lm(`%SB Time`~Age+Sex+EDU,MCI))
+
+SB.adas.graph.healthy<-as.data.frame(cbind(SBresidHealthy,ADASCogresidHealthy))
+names(SB.adas.graph.healthy)<-c("SB","ADASCog")
+SB.adas.graph.healthy$SB<-SB.adas.graph.healthy$SB + mean(Healthy$`%SB Time`)
+SB.adas.graph.healthy$Status<-"Healthy"
+
+SB.adas.graph.MCI<-as.data.frame(cbind(SBresidMCI,ADASCogresidMCI))
+names(SB.adas.graph.MCI)<-c("SB","ADASCog")
+SB.adas.graph.MCI$SB<-SB.adas.graph.MCI$SB + mean(MCI$`%SB Time`)
+SB.adas.graph.MCI$Status<-"MCI"
+
+SB.adas.graph.full<-rbind(SB.adas.graph.MCI,SB.adas.graph.healthy)
+
+ggplot(data = SB.adas.graph.full, aes(x = SB, y = ADASCog, color= Status, fill= Status)) + 
+  labs(x="%SB", y="ADAS-Cog Plus Score") +geom_point(color='black') + geom_smooth(method= 'lm') +
+  theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+                     panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+
+
+#SB Bouts and Cognition
+SBboutsresidHealthy<-residuals(lm(`Avg 30+ Min Bouts of SB`~Age+Sex+EDU,Healthy))
+SBboutsresidMCI<-residuals(lm(`Avg 30+ Min Bouts of SB`~Age+Sex+EDU,MCI))
+
+SBbouts.adas.graph.healthy<-as.data.frame(cbind(SBboutsresidHealthy,ADASCogresidHealthy))
+names(SBbouts.adas.graph.healthy)<-c("SBbouts","ADASCog")
+SBbouts.adas.graph.healthy$SBbouts<-SBbouts.adas.graph.healthy$SB + mean(Healthy$`Avg 30+ Min Bouts of SB`)
+SBbouts.adas.graph.healthy$Status<-"Healthy"
+
+SBbouts.adas.graph.MCI<-as.data.frame(cbind(SBboutsresidMCI,ADASCogresidMCI))
+names(SBbouts.adas.graph.MCI)<-c("SBbouts","ADASCog")
+SBbouts.adas.graph.MCI$SBbouts<-SBbouts.adas.graph.MCI$SB + mean(MCI$`Avg 30+ Min Bouts of SB`)
+SBbouts.adas.graph.MCI$Status<-"MCI"
+
+SBbouts.adas.graph.full<-rbind(SBbouts.adas.graph.MCI,SBbouts.adas.graph.healthy)
+
+
+ggplot(data = SBbouts.adas.graph.full, aes(x = SBbouts, y = ADASCog, color= Status, fill= Status)) + 
+  labs(x="Average 30+ SB bouts/day", y="ADAS-Cog Plus Score") +geom_point(color='black') + geom_smooth(method= 'lm') +
+  theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+                     panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+
+
+
+```

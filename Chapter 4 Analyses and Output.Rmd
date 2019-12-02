@@ -1,0 +1,759 @@
+---
+title: "Chapter 4 Analyses and Output"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+#######################################################################################
+# Chapter 4 Data Analyses
+# Author: Ryan Falck
+# Last edited: 2019-11-27
+#######################################################################################
+
+
+#Data management---------------------------------------------
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(readxl, psych, Hmisc,lavaan, semPlot, semTools, ppcor, pastecs)
+setwd("C:/Users/rfalck/Desktop/UBC-PhD/Thesis Material/Thesis defense materials/Theis Data and Analyses")#Directory where you put the spreadsheet
+PAS <- read_excel("Chapter 4 Data.xlsx", sheet= "Averages")
+
+PA_Sleep <- subset(PAS, Complete.data.13days =='1')
+
+#Daily averages
+PA_Sleep$Avg.Frag <- (PA_Sleep$Fragmentation.Day.1 + PA_Sleep$Fragmentation.Day.2 + PA_Sleep$Fragmentation.Day.3 + PA_Sleep$Fragmentation.Day.4 + PA_Sleep$Fragmentation.Day.5 + PA_Sleep$Fragmentation.Day.6 + PA_Sleep$Fragmentation.Day.7 + PA_Sleep$Fragmentation.Day.8 + PA_Sleep$Fragmentation.Day.9 + PA_Sleep$Fragmentation.Day.10 + PA_Sleep$Fragmentation.Day.11 + PA_Sleep$Fragmentation.Day.12 + PA_Sleep$Fragmentation.Day.13)/13
+PA_Sleep$Avg.Dur <- (PA_Sleep$Duration.Day.1 + PA_Sleep$Duration.Day.2 + PA_Sleep$Duration.Day.3 + PA_Sleep$Duration.Day.4 + PA_Sleep$Duration.Day.5 + PA_Sleep$Duration.Day.6 + PA_Sleep$Duration.Day.7 + PA_Sleep$Duration.Day.8 + PA_Sleep$Duration.Day.9 + PA_Sleep$Duration.Day.10 + PA_Sleep$Duration.Day.11 + PA_Sleep$Duration.Day.12 + PA_Sleep$Duration.Day.13)/13
+PA_Sleep$Avg.Lat <- (PA_Sleep$Latency.Day.1 +PA_Sleep$Latency.Day.2 + PA_Sleep$Latency.Day.3 + PA_Sleep$Latency.Day.4 + PA_Sleep$Latency.Day.5 + PA_Sleep$Latency.Day.6 + PA_Sleep$Latency.Day.7 + PA_Sleep$Latency.Day.8 + PA_Sleep$Latency.Day.9 + PA_Sleep$Latency.Day.10 + PA_Sleep$Latency.Day.11 + PA_Sleep$Latency.Day.12 + PA_Sleep$Latency.Day.13)/13
+PA_Sleep$Avg.Eff <- (PA_Sleep$Efficiency.Day.1 + PA_Sleep$Efficiency.Day.2 + PA_Sleep$Efficiency.Day.3 + PA_Sleep$Efficiency.Day.4 + PA_Sleep$Efficiency.Day.5 + PA_Sleep$Efficiency.Day.6 + PA_Sleep$Efficiency.Day.7 + PA_Sleep$Efficiency.Day.8 + PA_Sleep$Efficiency.Day.9 + PA_Sleep$Efficiency.Day.10 + PA_Sleep$Efficiency.Day.11 + PA_Sleep$Efficiency.Day.12 + PA_Sleep$Efficiency.Day.13)/13
+PA_Sleep$Avg.PA <- (PA_Sleep$MVPA.Minutes.Day.1 + PA_Sleep$MVPA.Minutes.Day.2 + PA_Sleep$MVPA.Minutes.Day.3 + PA_Sleep$MVPA.Minutes.Day.4 + PA_Sleep$MVPA.Minutes.Day.5 + PA_Sleep$MVPA.Minutes.Day.6 + PA_Sleep$MVPA.Minutes.Day.7 + PA_Sleep$MVPA.Minutes.Day.8 + PA_Sleep$MVPA.Minutes.Day.9 + PA_Sleep$MVPA.Minutes.Day.10 + PA_Sleep$MVPA.Minutes.Day.11 + PA_Sleep$MVPA.Minutes.Day.12 + PA_Sleep$MVPA.Minutes.Day.13)/13
+PA_Sleep$Avg.Awake <- (PA_Sleep$Awakenings.1 + PA_Sleep$Awakenings.2 + PA_Sleep$Awakenings.3 + PA_Sleep$Awakenings.4 + PA_Sleep$Awakenings.5 + PA_Sleep$Awakenings.6 + PA_Sleep$Awakenings.7 + PA_Sleep$Awakenings.8 + PA_Sleep$Awakenings.9 + PA_Sleep$Awakenings.10 + PA_Sleep$Awakenings.11 + PA_Sleep$Awakenings.12 + PA_Sleep$Awakenings.13)/13
+
+PA_Sleep$Smoking<-NA
+PA_Sleep$Smoking[PA_Sleep$Current.Smoker=="1"]<-2
+PA_Sleep$Smoking[PA_Sleep$Past.Smoker=="1"]<-1
+PA_Sleep$Smoking[PA_Sleep$Past.Smoker=="0"]<-0
+
+#Removing outliers
+PA_Sleep.1 <- PA_Sleep[ which(PA_Sleep$Avg.Pcnt.MVPA < 29.97 & PA_Sleep$Avg.Frag < 64.58 & PA_Sleep$Avg.Lat < 34.17 & PA_Sleep$Avg.Eff > 64.13 & PA_Sleep$ADAS.Cog.Plus < 1.29),]
+
+
+#Descriptive statistics for full data set-------------------------------
+describe(PA_Sleep$Age)
+sd(PA_Sleep$Age)
+
+Sex.table <- table(PA_Sleep$Sex)
+cbind(Sex.table,prop.table(Sex.table))
+
+Smoking.table <- table(PA_Sleep$Smoking)
+cbind(Smoking.table,prop.table(Smoking.table))
+
+Education.table <- table(PA_Sleep$Education)
+cbind(Education.table,prop.table(Education.table))
+
+describe(PA_Sleep$MMSE)
+sd(PA_Sleep$MMSE)
+
+describe(PA_Sleep$MoCA)
+sd(PA_Sleep$MoCA)
+
+describe(PA_Sleep$ADAS.Cog.Plus)
+sd(PA_Sleep$ADAS.Cog.Plus)
+
+describe(PA_Sleep$Avg.Pcnt.MVPA)
+sd(PA_Sleep$Avg.Pcnt.MVPA)
+
+
+
+##Adjusted values for Fragmentation, Efficiency, and Duration##
+PA_Sleep$Frag.fit <- NA
+Frag_lm <- lm(Avg.Frag ~ Avg.Awake, data=PA_Sleep, na.action =  na.exclude)
+PA_Sleep$Frag.fit <- fitted(Frag_lm)
+
+PA_Sleep$Eff.fit <- NA
+Eff_lm <- lm(Avg.Eff ~ Avg.Awake, data=PA_Sleep, na.action =  na.exclude)
+PA_Sleep$Eff.fit <- fitted(Eff_lm)
+
+PA_Sleep$Lat.fit <- NA
+Lat_lm <- lm(Avg.Lat ~ Avg.Awake, data=PA_Sleep, na.action =  na.exclude)
+PA_Sleep$Lat.fit <- fitted(Lat_lm)
+
+
+#descriptives for fitted variables#
+
+stat.desc(PA_Sleep$Frag.fit)
+sd(PA_Sleep$Frag.fit)
+
+stat.desc(PA_Sleep$Eff.fit)
+sd(PA_Sleep$Eff.fit)
+
+describe(PA_Sleep$Avg.Dur)
+sd(PA_Sleep$Avg.Dur)
+
+stat.desc(PA_Sleep$Lat.fit)
+sd(PA_Sleep$Lat.fit)
+
+
+#Descriptive statistics for outliers removed data set
+
+describe(PA_Sleep.1$Age)
+sd(PA_Sleep.1$Age)
+
+Sex.table <- table(PA_Sleep.1$Sex)
+cbind(Sex.table,prop.table(Sex.table))
+
+Smoking.table <- table(PA_Sleep.1$Smoking)
+cbind(Smoking.table,prop.table(Smoking.table))
+
+Education.table <- table(PA_Sleep.1$Education)
+cbind(Education.table,prop.table(Education.table))
+
+describe(PA_Sleep.1$MMSE)
+sd(PA_Sleep.1$MMSE)
+
+describe(PA_Sleep.1$MoCA)
+sd(PA_Sleep.1$MoCA)
+
+describe(PA_Sleep.1$ADAS.Cog.Plus)
+sd(PA_Sleep.1$ADAS.Cog.Plus)
+
+describe(PA_Sleep.1$Avg.Pcnt.MVPA)
+sd(PA_Sleep.1$Avg.Pcnt.MVPA)
+
+
+##Adjusted values for Fragmentation, Efficiency, and Duration##
+PA_Sleep.1$Frag.fit <- NA
+Frag_lm <- lm(Avg.Frag ~ Avg.Awake, data=PA_Sleep.1, na.action =  na.exclude)
+PA_Sleep.1$Frag.fit <- fitted(Frag_lm)
+
+PA_Sleep.1$Eff.fit <- NA
+Eff_lm <- lm(Avg.Eff ~ Avg.Awake, data=PA_Sleep.1, na.action =  na.exclude)
+PA_Sleep.1$Eff.fit <- fitted(Eff_lm)
+
+PA_Sleep.1$Lat.fit <- NA
+Lat_lm <- lm(Avg.Lat ~ Avg.Awake, data=PA_Sleep.1, na.action =  na.exclude)
+PA_Sleep.1$Lat.fit <- fitted(Lat_lm)
+
+#Averages for fitted variables
+stat.desc(PA_Sleep.1$Frag.fit)
+sd(PA_Sleep.1$Frag.fit)
+
+stat.desc(PA_Sleep.1$Eff.fit)
+sd(PA_Sleep.1$Eff.fit)
+
+describe(PA_Sleep.1$Avg.Dur)
+sd(PA_Sleep.1$Avg.Dur)
+
+stat.desc(PA_Sleep.1$Lat.fit)
+sd(PA_Sleep.1$Lat.fit)
+
+
+#Correlations for full data set------------------------------------------
+Correlation.Full <- subset(PA_Sleep, select=c(Age, PSQI.Total, ADAS.Cog.Plus, Avg.Pcnt.MVPA, Avg.Frag, Avg.Eff, Avg.Dur, Avg.Lat, Avg.Awake))
+Correlation.Full <-subset(Correlation.Full, Avg.Frag !='NA' & Avg.Eff !='NA' & Avg.Awake !='NA' & Avg.Dur != 'NA' & Avg.Lat !='NA' & Avg.Pcnt.MVPA != 'NA')
+Correlation.Full.PSQI <- subset(Correlation.Full, PSQI.Total !='NA')
+cor(Correlation.Full, use= "complete.obs")
+cor.test(Correlation.Full$Avg.Dur, Correlation.Full$Avg.Pcnt.MVPA)
+
+#Correlations for Full Dataset accounting for Awakenings#
+
+cor.test(Correlation.Full.PSQI$PSQI.Total, Correlation.Full.PSQI$Age)
+cor.test(Correlation.Full$ADAS.Cog.Plus, Correlation.Full$Age)
+cor.test(Correlation.Full$Avg.Pcnt.MVPA, Correlation.Full$Age)
+pcor.test(Correlation.Full$Avg.Frag, Correlation.Full$Age, Correlation.Full$Avg.Awake)
+pcor.test(Correlation.Full$Avg.Eff, Correlation.Full$Age, Correlation.Full$Avg.Awake)
+cor.test(Correlation.Full$Avg.Dur, Correlation.Full$Age)
+pcor.test(Correlation.Full$Avg.Lat, Correlation.Full$Age, Correlation.Full$Avg.Awake)
+
+cor.test(Correlation.Full.PSQI$ADAS.Cog.Plus, Correlation.Full.PSQI$PSQI.Total)
+cor.test(Correlation.Full.PSQI$Avg.Pcnt.MVPA, Correlation.Full.PSQI$PSQI.Total)
+pcor.test(Correlation.Full.PSQI$Avg.Frag, Correlation.Full.PSQI$PSQI.Total, Correlation.Full.PSQI$Avg.Awake)
+pcor.test(Correlation.Full.PSQI$Avg.Eff, Correlation.Full.PSQI$PSQI.Total, Correlation.Full.PSQI$Avg.Awake)
+cor.test(Correlation.Full.PSQI$Avg.Dur, Correlation.Full.PSQI$PSQI.Total)
+pcor.test(Correlation.Full.PSQI$Avg.Lat, Correlation.Full.PSQI$PSQI.Total, Correlation.Full.PSQI$Avg.Awake)
+
+
+cor.test(Correlation.Full$Avg.Pcnt.MVPA, Correlation.Full$ADAS.Cog.Plus)
+pcor.test(Correlation.Full$Avg.Frag, Correlation.Full$ADAS.Cog.Plus, Correlation.Full$Avg.Awake)
+pcor.test(Correlation.Full$Avg.Eff, Correlation.Full$ADAS.Cog.Plus, Correlation.Full$Avg.Awake)
+cor.test(Correlation.Full$Avg.Dur, Correlation.Full$ADAS.Cog.Plus)
+pcor.test(Correlation.Full$Avg.Lat, Correlation.Full$ADAS.Cog.Plus, Correlation.Full$Avg.Awake)
+
+pcor.test(Correlation.Full$Avg.Frag, Correlation.Full$Avg.Pcnt.MVPA, Correlation.Full$Avg.Awake)
+pcor.test(Correlation.Full$Avg.Eff, Correlation.Full$Avg.Pcnt.MVPA, Correlation.Full$Avg.Awake)
+cor.test(Correlation.Full$Avg.Dur, Correlation.Full$Avg.Pcnt.MVPA)
+pcor.test(Correlation.Full$Avg.Lat, Correlation.Full$Avg.Pcnt.MVPA, Correlation.Full$Avg.Awake)
+
+
+pcor.test(Correlation.Full$Avg.Eff, Correlation.Full$Avg.Frag, Correlation.Full$Avg.Awake)
+pcor.test(Correlation.Full$Avg.Dur, Correlation.Full$Avg.Frag, Correlation.Full$Avg.Awake)
+pcor.test(Correlation.Full$Avg.Lat, Correlation.Full$Avg.Frag, Correlation.Full$Avg.Awake)
+
+pcor.test(Correlation.Full$Avg.Dur, Correlation.Full$Avg.Eff, Correlation.Full$Avg.Awake)
+pcor.test(Correlation.Full$Avg.Lat, Correlation.Full$Avg.Eff, Correlation.Full$Avg.Awake)
+
+pcor.test(Correlation.Full$Avg.Dur, Correlation.Full$Avg.Lat, Correlation.Full$Avg.Awake)
+
+
+#Correlations for outliers removed data set------------------------------------
+Correlation <- subset(PA_Sleep.1, select=c(Age, PSQI.Total, ADAS.Cog.Plus, Avg.Pcnt.MVPA, Avg.Frag, Avg.Eff, Avg.Dur, Avg.Lat, Avg.Awake))
+Correlation <-subset(Correlation, Avg.Frag !='NA' & Avg.Eff !='NA' & Avg.Awake !='NA' & Avg.Dur != 'NA' & Avg.Lat !='NA' & Avg.Pcnt.MVPA != 'NA')
+Correlation.PSQI <- subset(Correlation, PSQI.Total !='NA')
+cor(Correlation, use= "complete.obs")
+cor.test(Correlation$Avg.Dur, Correlation$Age)
+
+#Correlations for Outliers removed accounting for Awakenings#
+cor.test(Correlation.PSQI$PSQI.Total, Correlation.PSQI$Age)
+cor.test(Correlation$ADAS.Cog.Plus, Correlation$Age)
+cor.test(Correlation$Avg.Pcnt.MVPA, Correlation$Age)
+pcor.test(Correlation$Avg.Frag, Correlation$Age, Correlation$Avg.Awake)
+pcor.test(Correlation$Avg.Eff, Correlation$Age, Correlation$Avg.Awake)
+cor.test(Correlation$Avg.Dur, Correlation$Age)
+pcor.test(Correlation$Avg.Lat, Correlation$Age, Correlation$Avg.Awake)
+
+cor.test(Correlation.PSQI$ADAS.Cog.Plus, Correlation.PSQI$PSQI.Total)
+cor.test(Correlation.PSQI$Avg.Pcnt.MVPA, Correlation.PSQI$PSQI.Total)
+pcor.test(Correlation.PSQI$Avg.Frag, Correlation.PSQI$PSQI.Total, Correlation.PSQI$Avg.Awake)
+pcor.test(Correlation.PSQI$Avg.Eff, Correlation.PSQI$PSQI.Total, Correlation.PSQI$Avg.Awake)
+cor.test(Correlation.PSQI$Avg.Dur, Correlation.PSQI$PSQI.Total)
+pcor.test(Correlation.PSQI$Avg.Lat, Correlation.PSQI$PSQI.Total, Correlation.PSQI$Avg.Awake)
+
+
+cor.test(Correlation$Avg.Pcnt.MVPA, Correlation$ADAS.Cog.Plus)
+pcor.test(Correlation$Avg.Frag, Correlation$ADAS.Cog.Plus, Correlation$Avg.Awake)
+pcor.test(Correlation$Avg.Eff, Correlation$ADAS.Cog.Plus, Correlation$Avg.Awake)
+cor.test(Correlation$Avg.Dur, Correlation$ADAS.Cog.Plus)
+pcor.test(Correlation$Avg.Lat, Correlation$ADAS.Cog.Plus, Correlation$Avg.Awake)
+
+
+pcor.test(Correlation$Avg.Frag, Correlation$Avg.Pcnt.MVPA, Correlation$Avg.Awake)
+pcor.test(Correlation$Avg.Eff, Correlation$Avg.Pcnt.MVPA, Correlation$Avg.Awake)
+cor.test(Correlation$Avg.Dur, Correlation$Avg.Pcnt.MVPA)
+pcor.test(Correlation$Avg.Lat, Correlation$Avg.Pcnt.MVPA, Correlation$Avg.Awake)
+
+
+pcor.test(Correlation$Avg.Eff, Correlation$Avg.Frag, Correlation$Avg.Awake)
+pcor.test(Correlation$Avg.Dur, Correlation$Avg.Frag, Correlation$Avg.Awake)
+pcor.test(Correlation$Avg.Lat, Correlation$Avg.Frag, Correlation$Avg.Awake)
+
+pcor.test(Correlation$Avg.Dur, Correlation$Avg.Eff, Correlation$Avg.Awake)
+pcor.test(Correlation$Avg.Lat, Correlation$Avg.Eff, Correlation$Avg.Awake)
+
+pcor.test(Correlation$Avg.Dur, Correlation$Avg.Lat, Correlation$Avg.Awake)
+
+
+
+#----------------Primary Analyses-------------------
+#STRUCTURAL EQUATION MODELS
+#---------------------------------------------------
+
+#~~~~~PSQI Model: Full data set~~~~~~~~~~~~~~~~~~~~~#
+sleep.PSQI <- '
+PA.I =~ 1*Pcnt.MVPA.Day.1 + 1*Pcnt.MVPA.Day.2 + 1*Pcnt.MVPA.Day.3 + 1*Pcnt.MVPA.Day.4 + 1*Pcnt.MVPA.Day.5 + 1*Pcnt.MVPA.Day.6 + 1*Pcnt.MVPA.Day.7 + 1*Pcnt.MVPA.Day.8 + 1*Pcnt.MVPA.Day.9 + 1*Pcnt.MVPA.Day.10 + 1*Pcnt.MVPA.Day.11 + 1*Pcnt.MVPA.Day.12 + 1*Pcnt.MVPA.Day.13
+
+#regressions#  
+PA.I ~ Age + Sex + Smoking + MED.SLEEP
+PSQI.Total ~ Age + Sex + Smoking + MED.SLEEP
+
+#Correlations among PA Days#
+Pcnt.MVPA.Day.1 ~ Pcnt.MVPA.Day.2
+Pcnt.MVPA.Day.2 ~ Pcnt.MVPA.Day.3
+Pcnt.MVPA.Day.3 ~ Pcnt.MVPA.Day.4
+Pcnt.MVPA.Day.4 ~ Pcnt.MVPA.Day.5
+Pcnt.MVPA.Day.5 ~ Pcnt.MVPA.Day.6
+Pcnt.MVPA.Day.6 ~ Pcnt.MVPA.Day.7
+Pcnt.MVPA.Day.7 ~ Pcnt.MVPA.Day.8
+Pcnt.MVPA.Day.8 ~ Pcnt.MVPA.Day.9
+Pcnt.MVPA.Day.9 ~ Pcnt.MVPA.Day.10
+Pcnt.MVPA.Day.10 ~ Pcnt.MVPA.Day.11
+Pcnt.MVPA.Day.11 ~ Pcnt.MVPA.Day.12
+Pcnt.MVPA.Day.12 ~ Pcnt.MVPA.Day.13
+
+##Covariance between PA and PSQI##
+PA.I ~~ PSQI.Total
+
+##Relationship of PA and PSQI with ADAS-Cog Plus##
+ADAS.Cog.Plus ~ PA.I + PSQI.Total + Age + Sex + Education
+'
+model.sleep.PSQI <- growth(sleep.PSQI, data = PA_Sleep)
+summary(model.sleep.PSQI, fit.measures=TRUE, rsquare=TRUE, std = TRUE)
+semPaths(model.sleep.PSQI, "col", sizeMan = 6, edge.label.cex = .5, layout = "tree")
+
+
+#~~~~~~~~~~~~~~~PSQI Model Outliers Removed~~~~~~~~~~~~#
+sleep.PSQI <- '
+PA.I =~ 1*Pcnt.MVPA.Day.1 + 1*Pcnt.MVPA.Day.2 + 1*Pcnt.MVPA.Day.3 + 1*Pcnt.MVPA.Day.4 + 1*Pcnt.MVPA.Day.5 + 1*Pcnt.MVPA.Day.6 + 1*Pcnt.MVPA.Day.7 + 1*Pcnt.MVPA.Day.8 + 1*Pcnt.MVPA.Day.9 + 1*Pcnt.MVPA.Day.10 + 1*Pcnt.MVPA.Day.11 + 1*Pcnt.MVPA.Day.12 + 1*Pcnt.MVPA.Day.13
+
+#regressions#  
+PA.I ~ Age + Sex + Smoking + MED.SLEEP
+PSQI.Total ~ Age + Sex + Smoking + MED.SLEEP
+
+
+#Correlations among PA Days#
+Pcnt.MVPA.Day.1 ~ Pcnt.MVPA.Day.2
+Pcnt.MVPA.Day.2 ~ Pcnt.MVPA.Day.3
+Pcnt.MVPA.Day.3 ~ Pcnt.MVPA.Day.4
+Pcnt.MVPA.Day.4 ~ Pcnt.MVPA.Day.5
+Pcnt.MVPA.Day.5 ~ Pcnt.MVPA.Day.6
+Pcnt.MVPA.Day.6 ~ Pcnt.MVPA.Day.7
+Pcnt.MVPA.Day.7 ~ Pcnt.MVPA.Day.8
+Pcnt.MVPA.Day.8 ~ Pcnt.MVPA.Day.9
+Pcnt.MVPA.Day.9 ~ Pcnt.MVPA.Day.10
+Pcnt.MVPA.Day.10 ~ Pcnt.MVPA.Day.11
+Pcnt.MVPA.Day.11 ~ Pcnt.MVPA.Day.12
+Pcnt.MVPA.Day.12 ~ Pcnt.MVPA.Day.13
+
+##Covariance between PA and PSQI##
+PA.I ~~ PSQI.Total
+
+##Relationship of PA and PSQI with ADAS-Cog Plus##
+ADAS.Cog.Plus ~ PA.I + PSQI.Total + Age + Sex + Education
+'
+model.sleep.PSQI <- growth(sleep.PSQI, data = PA_Sleep.1)
+summary(model.sleep.PSQI, fit.measures=TRUE, rsquare=TRUE, std = TRUE)
+semPaths(model.sleep.PSQI, "col", sizeMan = 6, edge.label.cex = .5, layout = "tree")
+
+
+#~~~~~~~~~~~~~~~~~~~~~Fragmentation Model Full Data Set~~~~~~~~~~~~~~~~~~#
+sleep.FragAwake.2 <- '
+PA.I =~ 1*Pcnt.MVPA.Day.1 + 1*Pcnt.MVPA.Day.2 + 1*Pcnt.MVPA.Day.3 + 1*Pcnt.MVPA.Day.4 + 1*Pcnt.MVPA.Day.5 + 1*Pcnt.MVPA.Day.6 + 1*Pcnt.MVPA.Day.7 + 1*Pcnt.MVPA.Day.8 + 1*Pcnt.MVPA.Day.9 + 1*Pcnt.MVPA.Day.10 + 1*Pcnt.MVPA.Day.11 + 1*Pcnt.MVPA.Day.12 + 1*Pcnt.MVPA.Day.13
+FRAG.I =~ 1*Fragmentation.Day.1 + 1*Fragmentation.Day.2 + 1*Fragmentation.Day.3 + 1*Fragmentation.Day.4 + 1*Fragmentation.Day.5 + 1*Fragmentation.Day.6 + 1*Fragmentation.Day.7 + 1*Fragmentation.Day.8 + 1*Fragmentation.Day.9 + 1*Fragmentation.Day.10 + 1*Fragmentation.Day.11 + 1*Fragmentation.Day.12 + 1*Fragmentation.Day.13
+
+#regressions#  
+PA.I ~ Age + Sex + Smoking + MED.SLEEP
+FRAG.I ~ Age + Sex + Smoking + MED.SLEEP + Avg.Awake
+
+##Correlations between days for latent factors##
+Pcnt.MVPA.Day.1 ~ Pcnt.MVPA.Day.2
+Pcnt.MVPA.Day.2 ~ Pcnt.MVPA.Day.3
+Pcnt.MVPA.Day.3 ~ Pcnt.MVPA.Day.4
+Pcnt.MVPA.Day.4 ~ Pcnt.MVPA.Day.5
+Pcnt.MVPA.Day.5 ~ Pcnt.MVPA.Day.6
+Pcnt.MVPA.Day.6 ~ Pcnt.MVPA.Day.7
+Pcnt.MVPA.Day.7 ~ Pcnt.MVPA.Day.8
+Pcnt.MVPA.Day.8 ~ Pcnt.MVPA.Day.9
+Pcnt.MVPA.Day.9 ~ Pcnt.MVPA.Day.10
+Pcnt.MVPA.Day.10 ~ Pcnt.MVPA.Day.11
+Pcnt.MVPA.Day.11 ~ Pcnt.MVPA.Day.12
+Pcnt.MVPA.Day.12 ~ Pcnt.MVPA.Day.13
+Fragmentation.Day.1 ~ Fragmentation.Day.2
+Fragmentation.Day.2 ~ Fragmentation.Day.3
+Fragmentation.Day.3 ~ Fragmentation.Day.4
+Fragmentation.Day.4 ~ Fragmentation.Day.5
+Fragmentation.Day.5 ~ Fragmentation.Day.6
+Fragmentation.Day.6 ~ Fragmentation.Day.7
+Fragmentation.Day.7 ~ Fragmentation.Day.8
+Fragmentation.Day.8 ~ Fragmentation.Day.9
+Fragmentation.Day.9 ~ Fragmentation.Day.10
+Fragmentation.Day.10 ~ Fragmentation.Day.11
+Fragmentation.Day.11 ~ Fragmentation.Day.12
+Fragmentation.Day.12 ~ Fragmentation.Day.13
+
+
+##Relationship of PA and PSQI with ADAS-Cog Plus##
+ADAS.Cog.Plus ~ PA.I + FRAG.I + Avg.Awake + Age + Sex + Education
+
+##Covariation between slopes##
+PA.I ~~ FRAG.I
+'
+model.sleep.FragAwake.2 <- growth(sleep.FragAwake.2, data = PA_Sleep)
+summary(model.sleep.FragAwake.2, fit.measures=TRUE, rsquare=TRUE, std = TRUE)
+semPaths(model.sleep.FragAwake.2, "col", sizeMan = 6, edge.label.cex = .5, layout = "tree")
+
+
+#~~~~~~~~~~~~~~~~~Fragmentation Model Outliers Removed~~~~~~~~~~~~~~~~~~~~#
+sleep.FragAwake.2 <- '
+PA.I =~ 1*Pcnt.MVPA.Day.1 + 1*Pcnt.MVPA.Day.2 + 1*Pcnt.MVPA.Day.3 + 1*Pcnt.MVPA.Day.4 + 1*Pcnt.MVPA.Day.5 + 1*Pcnt.MVPA.Day.6 + 1*Pcnt.MVPA.Day.7 + 1*Pcnt.MVPA.Day.8 + 1*Pcnt.MVPA.Day.9 + 1*Pcnt.MVPA.Day.10 + 1*Pcnt.MVPA.Day.11 + 1*Pcnt.MVPA.Day.12 + 1*Pcnt.MVPA.Day.13
+FRAG.I =~ 1*Fragmentation.Day.1 + 1*Fragmentation.Day.2 + 1*Fragmentation.Day.3 + 1*Fragmentation.Day.4 + 1*Fragmentation.Day.5 + 1*Fragmentation.Day.6 + 1*Fragmentation.Day.7 + 1*Fragmentation.Day.8 + 1*Fragmentation.Day.9 + 1*Fragmentation.Day.10 + 1*Fragmentation.Day.11 + 1*Fragmentation.Day.12 + 1*Fragmentation.Day.13
+
+#regressions#  
+PA.I ~ Age + Sex + Smoking + MED.SLEEP
+FRAG.I ~ Age + Sex + Smoking + MED.SLEEP + Avg.Awake
+
+##Correlations between days for latent factors##
+Pcnt.MVPA.Day.1 ~ Pcnt.MVPA.Day.2
+Pcnt.MVPA.Day.2 ~ Pcnt.MVPA.Day.3
+Pcnt.MVPA.Day.3 ~ Pcnt.MVPA.Day.4
+Pcnt.MVPA.Day.4 ~ Pcnt.MVPA.Day.5
+Pcnt.MVPA.Day.5 ~ Pcnt.MVPA.Day.6
+Pcnt.MVPA.Day.6 ~ Pcnt.MVPA.Day.7
+Pcnt.MVPA.Day.7 ~ Pcnt.MVPA.Day.8
+Pcnt.MVPA.Day.8 ~ Pcnt.MVPA.Day.9
+Pcnt.MVPA.Day.9 ~ Pcnt.MVPA.Day.10
+Pcnt.MVPA.Day.10 ~ Pcnt.MVPA.Day.11
+Pcnt.MVPA.Day.11 ~ Pcnt.MVPA.Day.12
+Pcnt.MVPA.Day.12 ~ Pcnt.MVPA.Day.13
+Fragmentation.Day.1 ~ Fragmentation.Day.2
+Fragmentation.Day.2 ~ Fragmentation.Day.3
+Fragmentation.Day.3 ~ Fragmentation.Day.4
+Fragmentation.Day.4 ~ Fragmentation.Day.5
+Fragmentation.Day.5 ~ Fragmentation.Day.6
+Fragmentation.Day.6 ~ Fragmentation.Day.7
+Fragmentation.Day.7 ~ Fragmentation.Day.8
+Fragmentation.Day.8 ~ Fragmentation.Day.9
+Fragmentation.Day.9 ~ Fragmentation.Day.10
+Fragmentation.Day.10 ~ Fragmentation.Day.11
+Fragmentation.Day.11 ~ Fragmentation.Day.12
+Fragmentation.Day.12 ~ Fragmentation.Day.13
+
+
+##Relationship of PA and PSQI with ADAS-Cog Plus##
+ADAS.Cog.Plus ~ PA.I + FRAG.I + Avg.Awake + Age + Sex + Education
+
+##Covariation between slopes##
+PA.I ~~ FRAG.I
+'
+model.sleep.FragAwake.2 <- growth(sleep.FragAwake.2, data = PA_Sleep.1)
+summary(model.sleep.FragAwake.2, fit.measures=TRUE, rsquare=TRUE, std = TRUE)
+semPaths(model.sleep.FragAwake.2, "col", sizeMan = 6, edge.label.cex = .5, layout = "tree")
+
+
+#~~~~~~~~~~~~~~~~Sleep Efficiency Full Model~~~~~~~~~~~~~~~#
+sleep.EffAwake <- '
+PA.I =~ 1*Pcnt.MVPA.Day.1 + 1*Pcnt.MVPA.Day.2 + 1*Pcnt.MVPA.Day.3 + 1*Pcnt.MVPA.Day.4 + 1*Pcnt.MVPA.Day.5 + 1*Pcnt.MVPA.Day.6 + 1*Pcnt.MVPA.Day.7 + 1*Pcnt.MVPA.Day.8 + 1*Pcnt.MVPA.Day.9 + 1*Pcnt.MVPA.Day.10 + 1*Pcnt.MVPA.Day.11 + 1*Pcnt.MVPA.Day.12 + 1*Pcnt.MVPA.Day.13
+EFF.I =~ 1*Efficiency.Day.1 + 1*Efficiency.Day.2 + 1*Efficiency.Day.3 + 1*Efficiency.Day.4 + 1*Efficiency.Day.5 + 1*Efficiency.Day.6 + 1*Efficiency.Day.7 + 1*Efficiency.Day.8 + 1*Efficiency.Day.9 + 1*Efficiency.Day.10 + 1*Efficiency.Day.11 + 1*Efficiency.Day.12 + 1*Efficiency.Day.13
+
+
+#regressions#  
+PA.I ~ Age + Sex + Smoking + MED.SLEEP
+EFF.I ~ Age + Sex + Smoking + MED.SLEEP + Avg.Awake
+
+##Correlations between days for latent factors##
+Pcnt.MVPA.Day.1 ~ Pcnt.MVPA.Day.2
+Pcnt.MVPA.Day.2 ~ Pcnt.MVPA.Day.3
+Pcnt.MVPA.Day.3 ~ Pcnt.MVPA.Day.4
+Pcnt.MVPA.Day.4 ~ Pcnt.MVPA.Day.5
+Pcnt.MVPA.Day.5 ~ Pcnt.MVPA.Day.6
+Pcnt.MVPA.Day.6 ~ Pcnt.MVPA.Day.7
+Pcnt.MVPA.Day.7 ~ Pcnt.MVPA.Day.8
+Pcnt.MVPA.Day.8 ~ Pcnt.MVPA.Day.9
+Pcnt.MVPA.Day.9 ~ Pcnt.MVPA.Day.10
+Pcnt.MVPA.Day.10 ~ Pcnt.MVPA.Day.11
+Pcnt.MVPA.Day.11 ~ Pcnt.MVPA.Day.12
+Pcnt.MVPA.Day.12 ~ Pcnt.MVPA.Day.13
+Efficiency.Day.1 ~ Efficiency.Day.2
+Efficiency.Day.2 ~ Efficiency.Day.3
+Efficiency.Day.3 ~ Efficiency.Day.4
+Efficiency.Day.4 ~ Efficiency.Day.5
+Efficiency.Day.5 ~ Efficiency.Day.6
+Efficiency.Day.6 ~ Efficiency.Day.7
+Efficiency.Day.7 ~ Efficiency.Day.8
+Efficiency.Day.8 ~ Efficiency.Day.9
+Efficiency.Day.9 ~ Efficiency.Day.10
+Efficiency.Day.10 ~ Efficiency.Day.11
+Efficiency.Day.11 ~ Efficiency.Day.12
+Efficiency.Day.12 ~ Efficiency.Day.13
+
+##Relationship of PA and PSQI with ADAS-Cog Plus##
+ADAS.Cog.Plus ~ PA.I + EFF.I + Age + Sex + Education + Avg.Awake
+
+##Covariation between slopes##
+PA.I ~~ EFF.I
+'
+model.sleep.EffAwake <- growth(sleep.EffAwake, data = PA_Sleep)
+summary(model.sleep.EffAwake, fit.measures=TRUE, rsquare=TRUE, std = TRUE)
+semPaths(model.sleep.EffAwake, "col", sizeMan = 6, edge.label.cex = .5, layout = "tree")
+
+
+
+#~~~~~~~~~~~~~~~Sleep Efficiency Outliers Removed~~~~~~~~~~~~~#
+sleep.EffAwake <- '
+PA.I =~ 1*Pcnt.MVPA.Day.1 + 1*Pcnt.MVPA.Day.2 + 1*Pcnt.MVPA.Day.3 + 1*Pcnt.MVPA.Day.4 + 1*Pcnt.MVPA.Day.5 + 1*Pcnt.MVPA.Day.6 + 1*Pcnt.MVPA.Day.7 + 1*Pcnt.MVPA.Day.8 + 1*Pcnt.MVPA.Day.9 + 1*Pcnt.MVPA.Day.10 + 1*Pcnt.MVPA.Day.11 + 1*Pcnt.MVPA.Day.12 + 1*Pcnt.MVPA.Day.13
+EFF.I =~ 1*Efficiency.Day.1 + 1*Efficiency.Day.2 + 1*Efficiency.Day.3 + 1*Efficiency.Day.4 + 1*Efficiency.Day.5 + 1*Efficiency.Day.6 + 1*Efficiency.Day.7 + 1*Efficiency.Day.8 + 1*Efficiency.Day.9 + 1*Efficiency.Day.10 + 1*Efficiency.Day.11 + 1*Efficiency.Day.12 + 1*Efficiency.Day.13
+
+
+#regressions#  
+PA.I ~ Age + Sex + Smoking + MED.SLEEP
+EFF.I ~ Age + Sex + Smoking + MED.SLEEP + Avg.Awake
+
+##Correlations between days for latent factors##
+Pcnt.MVPA.Day.1 ~ Pcnt.MVPA.Day.2
+Pcnt.MVPA.Day.2 ~ Pcnt.MVPA.Day.3
+Pcnt.MVPA.Day.3 ~ Pcnt.MVPA.Day.4
+Pcnt.MVPA.Day.4 ~ Pcnt.MVPA.Day.5
+Pcnt.MVPA.Day.5 ~ Pcnt.MVPA.Day.6
+Pcnt.MVPA.Day.6 ~ Pcnt.MVPA.Day.7
+Pcnt.MVPA.Day.7 ~ Pcnt.MVPA.Day.8
+Pcnt.MVPA.Day.8 ~ Pcnt.MVPA.Day.9
+Pcnt.MVPA.Day.9 ~ Pcnt.MVPA.Day.10
+Pcnt.MVPA.Day.10 ~ Pcnt.MVPA.Day.11
+Pcnt.MVPA.Day.11 ~ Pcnt.MVPA.Day.12
+Pcnt.MVPA.Day.12 ~ Pcnt.MVPA.Day.13
+Efficiency.Day.1 ~ Efficiency.Day.2
+Efficiency.Day.2 ~ Efficiency.Day.3
+Efficiency.Day.3 ~ Efficiency.Day.4
+Efficiency.Day.4 ~ Efficiency.Day.5
+Efficiency.Day.5 ~ Efficiency.Day.6
+Efficiency.Day.6 ~ Efficiency.Day.7
+Efficiency.Day.7 ~ Efficiency.Day.8
+Efficiency.Day.8 ~ Efficiency.Day.9
+Efficiency.Day.9 ~ Efficiency.Day.10
+Efficiency.Day.10 ~ Efficiency.Day.11
+Efficiency.Day.11 ~ Efficiency.Day.12
+Efficiency.Day.12 ~ Efficiency.Day.13
+
+##Relationship of PA and PSQI with ADAS-Cog Plus##
+ADAS.Cog.Plus ~ PA.I + EFF.I + Age + Sex + Education + Avg.Awake
+
+##Covariation between slopes##
+PA.I ~~ EFF.I
+'
+model.sleep.EffAwake <- growth(sleep.EffAwake, data = PA_Sleep.1)
+summary(model.sleep.EffAwake, fit.measures=TRUE, rsquare=TRUE, std = TRUE)
+semPaths(model.sleep.EffAwake, "col", sizeMan = 6, edge.label.cex = .5, layout = "tree")
+
+
+
+#~~~~~~~~~~~~~~~~Duration Full Model~~~~~~~~~~~~~~~#
+##Rewrite duration variables
+PA_Sleep$Duration.1 <- (PA_Sleep$Duration.Day.1)/60
+PA_Sleep$Duration.2 <- (PA_Sleep$Duration.Day.2)/60
+PA_Sleep$Duration.3 <- (PA_Sleep$Duration.Day.3)/60
+PA_Sleep$Duration.4 <- (PA_Sleep$Duration.Day.4)/60
+PA_Sleep$Duration.5 <- (PA_Sleep$Duration.Day.5)/60
+PA_Sleep$Duration.6 <- (PA_Sleep$Duration.Day.6)/60
+PA_Sleep$Duration.7 <- (PA_Sleep$Duration.Day.7)/60
+PA_Sleep$Duration.8 <- (PA_Sleep$Duration.Day.8)/60
+PA_Sleep$Duration.9 <- (PA_Sleep$Duration.Day.9)/60
+PA_Sleep$Duration.10 <- (PA_Sleep$Duration.Day.10)/60
+PA_Sleep$Duration.11 <- (PA_Sleep$Duration.Day.11)/60
+PA_Sleep$Duration.12 <- (PA_Sleep$Duration.Day.12)/60
+PA_Sleep$Duration.13 <- (PA_Sleep$Duration.Day.13)/60
+PA_Sleep.1$Duration.1 <- (PA_Sleep.1$Duration.Day.1)/60
+PA_Sleep.1$Duration.2 <- (PA_Sleep.1$Duration.Day.2)/60
+PA_Sleep.1$Duration.3 <- (PA_Sleep.1$Duration.Day.3)/60
+PA_Sleep.1$Duration.4 <- (PA_Sleep.1$Duration.Day.4)/60
+PA_Sleep.1$Duration.5 <- (PA_Sleep.1$Duration.Day.5)/60
+PA_Sleep.1$Duration.6 <- (PA_Sleep.1$Duration.Day.6)/60
+PA_Sleep.1$Duration.7 <- (PA_Sleep.1$Duration.Day.7)/60
+PA_Sleep.1$Duration.8 <- (PA_Sleep.1$Duration.Day.8)/60
+PA_Sleep.1$Duration.9 <- (PA_Sleep.1$Duration.Day.9)/60
+PA_Sleep.1$Duration.10 <- (PA_Sleep.1$Duration.Day.10)/60	
+PA_Sleep.1$Duration.11 <- (PA_Sleep.1$Duration.Day.11)/60
+PA_Sleep.1$Duration.12 <- (PA_Sleep.1$Duration.Day.12)/60
+PA_Sleep.1$Duration.13 <- (PA_Sleep.1$Duration.Day.13)/60
+
+sleep.dur <- '
+DUR.I =~ 1*Duration.1 + 1*Duration.2 + 1*Duration.3 + 1*Duration.4 + 1*Duration.5 + 1*Duration.6 + 1*Duration.7 + 1*Duration.8 + 1*Duration.9 + 1*Duration.10 + 1*Duration.11 + 1*Duration.12 + 1*Duration.13
+PA.I =~ 1*Pcnt.MVPA.Day.1 + 1*Pcnt.MVPA.Day.2 + 1*Pcnt.MVPA.Day.3 + 1*Pcnt.MVPA.Day.4 + 1*Pcnt.MVPA.Day.5 + 1*Pcnt.MVPA.Day.6 + 1*Pcnt.MVPA.Day.7 + 1*Pcnt.MVPA.Day.8 + 1*Pcnt.MVPA.Day.9 + 1*Pcnt.MVPA.Day.10 + 1*Pcnt.MVPA.Day.11 + 1*Pcnt.MVPA.Day.12 + 1*Pcnt.MVPA.Day.13
+
+#regressions#  
+DUR.I ~ Age + Sex + Smoking + MED.SLEEP
+PA.I ~ Age + Sex + Smoking + MED.SLEEP
+
+##Correlation between days for latent factors##
+Pcnt.MVPA.Day.1 ~ Pcnt.MVPA.Day.2
+Pcnt.MVPA.Day.2 ~ Pcnt.MVPA.Day.3
+Pcnt.MVPA.Day.3 ~ Pcnt.MVPA.Day.4
+Pcnt.MVPA.Day.4 ~ Pcnt.MVPA.Day.5
+Pcnt.MVPA.Day.5 ~ Pcnt.MVPA.Day.6
+Pcnt.MVPA.Day.6 ~ Pcnt.MVPA.Day.7
+Pcnt.MVPA.Day.7 ~ Pcnt.MVPA.Day.8
+Pcnt.MVPA.Day.8 ~ Pcnt.MVPA.Day.9
+Pcnt.MVPA.Day.9 ~ Pcnt.MVPA.Day.10
+Pcnt.MVPA.Day.10 ~ Pcnt.MVPA.Day.11
+Pcnt.MVPA.Day.11 ~ Pcnt.MVPA.Day.12
+Pcnt.MVPA.Day.12 ~ Pcnt.MVPA.Day.13
+Duration.1 ~ Duration.2
+Duration.2 ~ Duration.3
+Duration.3 ~ Duration.4
+Duration.4 ~ Duration.5
+Duration.5 ~ Duration.6
+Duration.6 ~ Duration.7
+Duration.7 ~ Duration.8
+Duration.8 ~ Duration.9
+Duration.9 ~ Duration.10
+Duration.10 ~ Duration.11
+Duration.11 ~ Duration.12
+Duration.12 ~ Duration.13
+
+##Covariation between slopes##
+DUR.I ~~ PA.I
+
+##Relationship of PA and Duration with ADAS-Cog Plus##
+ADAS.Cog.Plus ~ PA.I + DUR.I + Age + Sex + Education
+'
+model.sleep.dur <- growth(sleep.dur, data = PA_Sleep)
+summary(model.sleep.dur, fit.measures=TRUE, rsquare=TRUE, std = TRUE)
+semPaths(model.sleep.dur, "col", sizeMan = 6, edge.label.cex = .5, layout = "tree")
+
+
+#~~~~~~~~~~~~~~~~~~~Duration Model Outliers Removed~~~~~~~~~~~~~~~~~~~#
+##Rewrite duration variables
+PA_Sleep$Duration.1 <- (PA_Sleep$Duration.Day.1)/60
+PA_Sleep$Duration.2 <- (PA_Sleep$Duration.Day.2)/60
+PA_Sleep$Duration.3 <- (PA_Sleep$Duration.Day.3)/60
+PA_Sleep$Duration.4 <- (PA_Sleep$Duration.Day.4)/60
+PA_Sleep$Duration.5 <- (PA_Sleep$Duration.Day.5)/60
+PA_Sleep$Duration.6 <- (PA_Sleep$Duration.Day.6)/60
+PA_Sleep$Duration.7 <- (PA_Sleep$Duration.Day.7)/60
+PA_Sleep$Duration.8 <- (PA_Sleep$Duration.Day.8)/60
+PA_Sleep$Duration.9 <- (PA_Sleep$Duration.Day.9)/60
+PA_Sleep$Duration.10 <- (PA_Sleep$Duration.Day.10)/60
+PA_Sleep$Duration.11 <- (PA_Sleep$Duration.Day.11)/60
+PA_Sleep$Duration.12 <- (PA_Sleep$Duration.Day.12)/60
+PA_Sleep$Duration.13 <- (PA_Sleep$Duration.Day.13)/60
+PA_Sleep.1$Duration.1 <- (PA_Sleep.1$Duration.Day.1)/60
+PA_Sleep.1$Duration.2 <- (PA_Sleep.1$Duration.Day.2)/60
+PA_Sleep.1$Duration.3 <- (PA_Sleep.1$Duration.Day.3)/60
+PA_Sleep.1$Duration.4 <- (PA_Sleep.1$Duration.Day.4)/60
+PA_Sleep.1$Duration.5 <- (PA_Sleep.1$Duration.Day.5)/60
+PA_Sleep.1$Duration.6 <- (PA_Sleep.1$Duration.Day.6)/60
+PA_Sleep.1$Duration.7 <- (PA_Sleep.1$Duration.Day.7)/60
+PA_Sleep.1$Duration.8 <- (PA_Sleep.1$Duration.Day.8)/60
+PA_Sleep.1$Duration.9 <- (PA_Sleep.1$Duration.Day.9)/60
+PA_Sleep.1$Duration.10 <- (PA_Sleep.1$Duration.Day.10)/60	
+PA_Sleep.1$Duration.11 <- (PA_Sleep.1$Duration.Day.11)/60
+PA_Sleep.1$Duration.12 <- (PA_Sleep.1$Duration.Day.12)/60
+PA_Sleep.1$Duration.13 <- (PA_Sleep.1$Duration.Day.13)/60
+
+sleep.dur <- '
+DUR.I =~ 1*Duration.1 + 1*Duration.2 + 1*Duration.3 + 1*Duration.4 + 1*Duration.5 + 1*Duration.6 + 1*Duration.7 + 1*Duration.8 + 1*Duration.9 + 1*Duration.10 + 1*Duration.11 + 1*Duration.12 + 1*Duration.13
+PA.I =~ 1*Pcnt.MVPA.Day.1 + 1*Pcnt.MVPA.Day.2 + 1*Pcnt.MVPA.Day.3 + 1*Pcnt.MVPA.Day.4 + 1*Pcnt.MVPA.Day.5 + 1*Pcnt.MVPA.Day.6 + 1*Pcnt.MVPA.Day.7 + 1*Pcnt.MVPA.Day.8 + 1*Pcnt.MVPA.Day.9 + 1*Pcnt.MVPA.Day.10 + 1*Pcnt.MVPA.Day.11 + 1*Pcnt.MVPA.Day.12 + 1*Pcnt.MVPA.Day.13
+
+#regressions#  
+DUR.I ~ Age + Sex + Smoking + MED.SLEEP
+PA.I ~ Age + Sex + Smoking + MED.SLEEP
+
+
+##Correlation between days##
+Pcnt.MVPA.Day.1 ~ Pcnt.MVPA.Day.2
+Pcnt.MVPA.Day.2 ~ Pcnt.MVPA.Day.3
+Pcnt.MVPA.Day.3 ~ Pcnt.MVPA.Day.4
+Pcnt.MVPA.Day.4 ~ Pcnt.MVPA.Day.5
+Pcnt.MVPA.Day.5 ~ Pcnt.MVPA.Day.6
+Pcnt.MVPA.Day.6 ~ Pcnt.MVPA.Day.7
+Pcnt.MVPA.Day.7 ~ Pcnt.MVPA.Day.8
+Pcnt.MVPA.Day.8 ~ Pcnt.MVPA.Day.9
+Pcnt.MVPA.Day.9 ~ Pcnt.MVPA.Day.10
+Pcnt.MVPA.Day.10 ~ Pcnt.MVPA.Day.11
+Pcnt.MVPA.Day.11 ~ Pcnt.MVPA.Day.12
+Pcnt.MVPA.Day.12 ~ Pcnt.MVPA.Day.13
+Duration.1 ~ Duration.2
+Duration.2 ~ Duration.3
+Duration.3 ~ Duration.4
+Duration.4 ~ Duration.5
+Duration.5 ~ Duration.6
+Duration.6 ~ Duration.7
+Duration.7 ~ Duration.8
+Duration.8 ~ Duration.9
+Duration.9 ~ Duration.10
+Duration.10 ~ Duration.11
+Duration.11 ~ Duration.12
+Duration.12 ~ Duration.13
+
+
+##Covariation between slopes##
+DUR.I ~~ PA.I
+
+##Relationship of PA and Duration with ADAS-Cog Plus##
+ADAS.Cog.Plus ~ PA.I + DUR.I + Age + Sex + Education 
+'
+model.sleep.dur <- growth(sleep.dur, data = PA_Sleep.1)
+summary(model.sleep.dur, fit.measures=TRUE, rsquare=TRUE, std = TRUE)
+semPaths(model.sleep.dur, "col", sizeMan = 6, edge.label.cex = .5, layout = "tree")
+
+
+#~~~~~~~~~~~~~~~~~~~~Sleep latency Full model~~~~~~~~~~~~~~~~~~~~#
+sleep.lat <- '
+LAT.I =~ 1*Latency.Day.1 + 1*Latency.Day.2 + 1*Latency.Day.3 + 1*Latency.Day.4 + 1*Latency.Day.5 + 1*Latency.Day.6 + 1*Latency.Day.7 + 1*Latency.Day.8 + 1*Latency.Day.9 + 1*Latency.Day.10 + 1*Latency.Day.11 + 1*Latency.Day.12 + 1*Latency.Day.13
+PA.I =~ 1*Pcnt.MVPA.Day.1 + 1*Pcnt.MVPA.Day.2 + 1*Pcnt.MVPA.Day.3 + 1*Pcnt.MVPA.Day.4 + 1*Pcnt.MVPA.Day.5 + 1*Pcnt.MVPA.Day.6 + 1*Pcnt.MVPA.Day.7 + 1*Pcnt.MVPA.Day.8 + 1*Pcnt.MVPA.Day.9 + 1*Pcnt.MVPA.Day.10 + 1*Pcnt.MVPA.Day.11 + 1*Pcnt.MVPA.Day.12 + 1*Pcnt.MVPA.Day.13
+
+#regressions#  
+LAT.I ~ Age + Sex + Smoking + MED.SLEEP + Avg.Awake
+PA.I ~ Age + Sex + Smoking + MED.SLEEP
+
+##Correlation between days for latent factors##
+Latency.Day.1 ~ Latency.Day.2
+Latency.Day.2 ~ Latency.Day.3
+Latency.Day.3 ~ Latency.Day.4
+Latency.Day.4 ~ Latency.Day.5
+Latency.Day.5 ~ Latency.Day.6
+Latency.Day.6 ~ Latency.Day.7
+Latency.Day.7 ~ Latency.Day.8
+Latency.Day.8 ~ Latency.Day.9
+Latency.Day.9 ~ Latency.Day.10
+Latency.Day.10 ~ Latency.Day.11
+Latency.Day.11 ~ Latency.Day.12
+Latency.Day.12 ~ Latency.Day.13
+Pcnt.MVPA.Day.1 ~ Pcnt.MVPA.Day.2
+Pcnt.MVPA.Day.2 ~ Pcnt.MVPA.Day.3
+Pcnt.MVPA.Day.3 ~ Pcnt.MVPA.Day.4
+Pcnt.MVPA.Day.4 ~ Pcnt.MVPA.Day.5
+Pcnt.MVPA.Day.5 ~ Pcnt.MVPA.Day.6
+Pcnt.MVPA.Day.6 ~ Pcnt.MVPA.Day.7
+Pcnt.MVPA.Day.7 ~ Pcnt.MVPA.Day.8
+Pcnt.MVPA.Day.8 ~ Pcnt.MVPA.Day.9
+Pcnt.MVPA.Day.9 ~ Pcnt.MVPA.Day.10
+Pcnt.MVPA.Day.10 ~ Pcnt.MVPA.Day.11
+Pcnt.MVPA.Day.11 ~ Pcnt.MVPA.Day.12
+Pcnt.MVPA.Day.12 ~ Pcnt.MVPA.Day.13
+
+
+##Covariation between slopes##
+LAT.I ~~ PA.I
+
+##Relationship of PA and Duration with ADAS-Cog Plus##
+ADAS.Cog.Plus ~ PA.I + LAT.I + Age + Sex + Education + Avg.Awake
+'
+model.sleep.lat <- growth(sleep.lat, data = PA_Sleep)
+summary(model.sleep.lat, fit.measures=TRUE, rsquare=TRUE, std = TRUE)
+semPaths(model.sleep.lat, "col", sizeMan = 6, edge.label.cex = .5, layout = "tree")
+
+
+
+#~~~~~~~~~~~~~~~Sleep latency outliers removed~~~~~~~~~~~~~~~~~#
+sleep.lat <- '
+LAT.I =~ 1*Latency.Day.1 + 1*Latency.Day.2 + 1*Latency.Day.3 + 1*Latency.Day.4 + 1*Latency.Day.5 + 1*Latency.Day.6 + 1*Latency.Day.7 + 1*Latency.Day.8 + 1*Latency.Day.9 + 1*Latency.Day.10 + 1*Latency.Day.11 + 1*Latency.Day.12 + 1*Latency.Day.13
+PA.I =~ 1*Pcnt.MVPA.Day.1 + 1*Pcnt.MVPA.Day.2 + 1*Pcnt.MVPA.Day.3 + 1*Pcnt.MVPA.Day.4 + 1*Pcnt.MVPA.Day.5 + 1*Pcnt.MVPA.Day.6 + 1*Pcnt.MVPA.Day.7 + 1*Pcnt.MVPA.Day.8 + 1*Pcnt.MVPA.Day.9 + 1*Pcnt.MVPA.Day.10 + 1*Pcnt.MVPA.Day.11 + 1*Pcnt.MVPA.Day.12 + 1*Pcnt.MVPA.Day.13
+
+#regressions#  
+LAT.I ~ Age + Sex + Smoking + MED.SLEEP + Avg.Awake
+PA.I ~ Age + Sex + Smoking + MED.SLEEP
+
+##Correlation between days for latent factors##
+Latency.Day.1 ~ Latency.Day.2
+Latency.Day.2 ~ Latency.Day.3
+Latency.Day.3 ~ Latency.Day.4
+Latency.Day.4 ~ Latency.Day.5
+Latency.Day.5 ~ Latency.Day.6
+Latency.Day.6 ~ Latency.Day.7
+Latency.Day.7 ~ Latency.Day.8
+Latency.Day.8 ~ Latency.Day.9
+Latency.Day.9 ~ Latency.Day.10
+Latency.Day.10 ~ Latency.Day.11
+Latency.Day.11 ~ Latency.Day.12
+Latency.Day.12 ~ Latency.Day.13
+Pcnt.MVPA.Day.1 ~ Pcnt.MVPA.Day.2
+Pcnt.MVPA.Day.2 ~ Pcnt.MVPA.Day.3
+Pcnt.MVPA.Day.3 ~ Pcnt.MVPA.Day.4
+Pcnt.MVPA.Day.4 ~ Pcnt.MVPA.Day.5
+Pcnt.MVPA.Day.5 ~ Pcnt.MVPA.Day.6
+Pcnt.MVPA.Day.6 ~ Pcnt.MVPA.Day.7
+Pcnt.MVPA.Day.7 ~ Pcnt.MVPA.Day.8
+Pcnt.MVPA.Day.8 ~ Pcnt.MVPA.Day.9
+Pcnt.MVPA.Day.9 ~ Pcnt.MVPA.Day.10
+Pcnt.MVPA.Day.10 ~ Pcnt.MVPA.Day.11
+Pcnt.MVPA.Day.11 ~ Pcnt.MVPA.Day.12
+Pcnt.MVPA.Day.12 ~ Pcnt.MVPA.Day.13
+
+
+##Covariation between slopes##
+LAT.I ~~ PA.I
+
+##Relationship of PA and Duration with ADAS-Cog Plus##
+ADAS.Cog.Plus ~ PA.I + LAT.I + Age + Sex + Education + Avg.Awake
+'
+model.sleep.lat <- growth(sleep.lat, data = PA_Sleep.1)
+summary(model.sleep.lat, fit.measures=TRUE, rsquare=TRUE, std = TRUE)
+semPaths(model.sleep.lat, "col", sizeMan = 6, edge.label.cex = .5, layout = "tree")
+
+
+
+
+
+```
